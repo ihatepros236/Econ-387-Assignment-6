@@ -1,0 +1,219 @@
+---
+title: "Assignment 6"
+author: "Muhammad, 301297154"
+output:
+  html_document: default
+  html_notebook: default
+  pdf_document: default
+---
+
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+
+list.of.packages <- c("tidyverse","rmarkdown" )
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+library(tidyverse)
+library(rmarkdown)
+library()
+```
+
+# Questions
+
+In this assignment, you will be working with property tax assessment data for the city of Vancouver (at the property level) from 2006 through 2018.   Each property is assessed each year and levied tax based on the assessed value. For more detail about the assessment process, see the [BC Assessment webpage](https://www.bcassessment.ca). The raw data was downloaded from Vancouver's [Open Data Catalogue](https://data.vancouver.ca/datacatalogue/propertyTax.htm). The files available on canvas (in a zip file) have been cleaned in a few ways (a few variables renamed to make more clear [e.g. apt. no. and street no.]; dropped commercial or industrial zoned properties; drop any that do not still exist in 2018; drop obs without any tax levied during a year). 
+
+## Question 1
+
+Write a `for` loop that reads the 13 `csv` files and rowbinds the files into a single data frame named `vanprop` (this stacks each year of data on top of eachother). You will be looping over year numbers and can use something like `for (i in c(2006:2018))`.  
+
+Show the structure of the data and note how many observations there are. At the top of your code chunk, use the options to turn off the warnings and messages `{r, warning = FALSE, message = FALSE}` (this is just to clean up your markdown file a bit). 
+
+````{r, warning = FALSE, message = FALSE}
+setwd("C:/Users/Muhammad/Projects/assignment 6")
+vanprop<-data.frame()
+
+list_of_csv<-c("p6.csv","p7.csv","p8.csv","p9.csv","p10.csv","p11.csv","p12.csv","p13.csv","p14.csv","p15.csv","p16.csv","p17.csv","p18.csv")
+
+print(list_of_csv)
+for(i in 1:13){
+  
+  data1<-read_csv(list_of_csv[i])
+  vanprop<-rbind(vanprop,data1)
+  
+}
+str(vanprop)
+#there are 215,7293 observations and 15 variables
+
+```
+
+
+
+
+
+## Question 2
+
+First, modify your `vanprop` data in the following ways in a single step using the pipe `%>%`. 
+1. keep the following variables: `current_land_value`, `current_improvement_value`, `tax_assessment_year`, `tax_levy` and `year_built` 
+2. create new variables: `total_value` that is equal to the `current_land_value` plus the `current_improvement_value`; `total_tax_pct` eqaul to the ratio of `tax_levy` over `total_value`; and `property_age` equal to the number of years between `tax_assessment_year` and `year_built`.
+
+Write a function that rescales variables to be in 1000s of dollars and apply this function to the columns in your data except `property_postal_code`, `property_age` and `total_tax_pct`. 
+
+
+```{r}
+
+vanprop2 <- vanprop %>%
+  select("property_postal_code", "current_land_value", "current_improvement_value", "tax_assessment_year", "tax_levy",  "year_built") %>%
+  mutate(total_value=current_land_value + current_improvement_value, 
+         total_tax_pct=tax_levy/total_value, 
+         property_age=tax_assessment_year-year_built)
+
+rescale <- function(x) {
+  x/1000
+}
+
+vanprop2$current_land_value <- rescale(vanprop2$current_land_value)
+vanprop2$current_improvement_value <- rescale(vanprop2$current_improvement_value)
+vanprop2$tax_levy <- rescale(vanprop2$tax_levy)
+vanprop2$total_value <- rescale(vanprop2$total_value)
+
+
+```
+
+## Question 3
+
+Use the `map_dbl()` function to calculate the means, standard deviation, minimum, median, and maximum values for each column in your data set that is a numeric column (make sure to include an option to ignore missing values). And then use `cbind()` to create an output that captures the variable names on the left and the mean, standard deviation, min and max for the variables in your data as the columns. 
+
+```{r}
+
+vanprop3<-select(vanprop2,current_land_value:property_age) 
+mean1<-map_dbl(vanprop3,mean,na.rm=TRUE)
+median1<-map_dbl(vanprop3,median,na.rm=TRUE)
+SD<-map_dbl(vanprop3,sd,na.rm=TRUE)
+MX<-map_dbl(vanprop3,max,na.rm=TRUE)
+all_stat<-cbind(mean1,median1,SD,MX)
+print(all_stat)
+
+
+```
+
+## Question 4
+
+Now, let's see if we can use some fancy R packages to create better looking tables of summary statistics. I'd like for you to read through this [example](https://people.ok.ubc.ca/jpither/modules/Tables_markdown.html) on creating a descriptive statistics table in R markdown that will show in an html format. 
+
+For your table, I'd like for you to create a variable categorizing properties by the year they were built in the following groups (before 1900, 1901-1950, 1950-1975, 1976-2000, 2001-2010, 2011-2018). I then want you to create a summary table reporting the number of properties (n), the mean, sd, q1, median, and q3 statistics for the total assessed value (land + improvement) by these categories of when properties were built. 
+
+Write a brief paragraph commenting on your table. What relationship do you see between how old the property is and total value? Are there any other interesting patterns in your table? 
+
+I will get you started below with loading the right packages, and then see if you can follow the example but apply your property tax data and saving the right statistics (you can skip the visualize the data part and go to the "Calculate descriptive statistics" part and use the `kable` code for knitting the table to HTML)
+
+## Q4 Solution
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+list.of.packages <- c("kableExtra","magick","tigerstats" )
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+library(knitr)
+library(kableExtra)
+library(magick)
+library(tigerstats)
+```
+
+```{r}
+vanprop5<-mutate(vanprop3,hage_grp=case_when(
+  year_built <= 1900 ~ "<1900",
+  year_built>1900 & year_built<1950~"1900-1950",
+  year_built>=1950 & year_built<1976~"1950-1975",
+  year_built>1975 & year_built<=2000~"1976-2000",
+  year_built>2000 & year_built<=2010~"2000-2010",
+  year_built>2010 & year_built<=2018~"2011-2018"
+))
+
+
+
+hage_summary<-favstats(total_value~hage_grp, data=vanprop5)
+hage_summary<-hage_summary[,c("hage_grp","Q1","Q3","mean","sd","n","median")]
+
+#It appears so that houses older than 1950 have higher median value than newer properties.  Even lower and upper quartile has higher value for houses older than 1950 compared to rest of the properties. 
+
+kable(hage_summary, format = "html",  
+      caption = "Table 1: Descriptive statistics for House age groups",
+      digits = c(0, 0, 2, 3), align = "ccrr") %>%
+  kable_styling(full_width = FALSE, position = "left") %>%
+  add_header_above(c(" " = 1, " " = 1, "Total Value" = 5))
+
+
+```
+
+
+## Question 5
+
+Return to the property crime data from A5 and create a table similar to that above in Q4 for summary statistics of total crimes (your choice which type of crime to look at) by neighbourhood. So each row in your table is a neighborhood name and the columns are the same as in Q4. 
+```{r}
+crime<-read_csv("crimedata.csv")
+total_crime<-filter(crime,TYPE=="Break and Enter Residential/Other",is.na(NEIGHBOURHOOD)!=1)%>%
+  group_by(NEIGHBOURHOOD,YEAR)%>% 
+  summarise(total=sum(TYPE=="Break and Enter Residential/Other"))
+
+
+
+crime_summary<-favstats(total~NEIGHBOURHOOD, data=total_crime)
+crime_summary<-crime_summary[,c("NEIGHBOURHOOD","Q1","Q3","mean","sd","n","median")]
+
+kable(crime_summary, format = "html",  
+      caption = "Table 1: Descriptive statistics for Crime",
+      digits = c(0, 0, 2, 3), align = "ccrr") %>%
+  kable_styling(full_width = FALSE, position = "left") %>%
+  add_header_above(c(" " = 1, " " = 1, "Break & Enter Crime" = 5))
+```
+## Question 6
+
+Find a data set of interest from BC's open dataset catalog (https://catalogue.data.gov.bc.ca/dataset) that is not property or crime related. There are thousands of options: education, environment, economy. Use your R programming skills to load the data and create at least one plot and one summary statistics table helping you to describe / discover what is in the dataset. Write one paragraph that clearly describes what the data captures and another paragraph discussing your figure and table, clearly describing what your figure and table communicate. **No two students should be using the same datasets for this question, there are too many for this to be possible. Be original, be creative.**
+
+```{r, warning = FALSE, message = FALSE}
+#https://catalogue.data.gov.bc.ca/dataset/gaming-grants-paid-to-community-organizations
+
+#This dataset is about gaming grants given to community organizations
+
+
+grant<-read_csv("new1.csv")
+grant$`Payment Amount` = (gsub("\\$", "", grant$`Payment Amount`))
+grant$`Payment Amount` = as.numeric(gsub("\\,", "", grant$`Payment Amount`))
+
+grant$`Government Fiscal Year`=gsub("FY","",grant$`Government Fiscal Year`)
+grant$`Government Fiscal Year`=gsub("\\/[0-9]*", "",grant$`Government Fiscal Year`)
+grant$`Government Fiscal Year`=as.numeric(gsub("\\-[0-9]*", "",grant$`Government Fiscal Year`))
+
+group_by(grant,`Government Fiscal Year`)%>%
+  filter(is.na(`Payment Amount`)!=1)%>%
+  summarize(total_yearly=sum(`Payment Amount`)) %>%
+ ggplot()+
+ geom_smooth(aes(y=total_yearly,x=`Government Fiscal Year`),se=FALSE)
+  
+grant<-filter(grant,is.na(`Payment Amount`)!=1)
+grant<-filter(grant,`Payment Amount`!=0)
+grant_summary<-favstats(`Payment Amount`~`Grant Type`, data=grant)
+grant_summary<-grant_summary[,c("Grant Type","Q1","Q3","mean","sd","n","median")]
+
+kable(grant_summary, format = "html",  
+      caption = "Table 3: Descriptive statistics for Grant Type",
+      digits = c(0, 0, 2, 3), align = "ccrr") %>%
+  kable_styling(full_width = FALSE, position = "left") %>%
+  add_header_above(c(" " = 1, " " = 1, "Grant Amount" = 5))
+
+#As we can see from the graph the gamming grant for communities has dropped from 2007 to the lowest around 2012,it is rising again after 2013 however it still has not reached prior to 2008 level.It might be that this particular market has not recovered from 2007/2008 financial crash. From descriptive statistics we found  that Community Gamming grant is most commonly awared grant type grants are the most awarded grants(29,681 grants have been awarded since 2007), on average  Community Gamming grant pays about $34,000 and has median payout of $20,000.
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
